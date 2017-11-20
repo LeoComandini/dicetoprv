@@ -263,11 +263,11 @@ class GeneratePrv:
                "private key: " + hex(self.prv)[2:]
 
 
-parser = ArgumentParser(description="Create private key with corresponding public key and address")
-parser.add_argument("base", type=int, help="dice number of faces")
-parser.add_argument("-m", "--method", type=int, choices=[1, 2, 3], default=1,
-                    help="method to insert randomness: 1 from dice, 2 all values are '1', 3 from keyboard")
-parser.add_argument("-u", "--uncompressed", help="obtain uncompressed keys and address", action="store_true")
-
-args = parser.parse_args()
-print(Keys(GeneratePrv(args.base, args.method).prv, not args.uncompressed))
+def receive_arguments():
+    parser = ArgumentParser(description="Create private key with corresponding public key and address")
+    parser.add_argument("base", type=int, help="dice number of faces")
+    parser.add_argument("-m", "--method", type=int, choices=[1, 2, 3], default=1,
+                        help="method to insert randomness: 1 from dice, 2 all values are '1', 3 from keyboard")
+    parser.add_argument("-u", "--uncompressed", help="obtain uncompressed keys and address", action="store_true")
+    args = parser.parse_args()
+    return Keys(GeneratePrv(args.base, args.method).prv, not args.uncompressed)
