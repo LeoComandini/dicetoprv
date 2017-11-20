@@ -1,18 +1,19 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
+
 """
 create a new private key
  1. insert randomness from the dice
- 2. insert randomness pressing the keyboard multiple times
- 3. dumb way for testing
+ 2. dumb way for testing
+ 3. insert randomness pressing the keyboard multiple times
 """
 
 # packages
-# from pytictoc import TicToc
+from pytictoc import TicToc
 from numpy import log
 from math import ceil
 from base58 import b58encode_check
 from hashlib import sha256, new as hash_new
-# from os import urandom
+from argparse import ArgumentParser
 
 # parameters
 ec_prime = 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f
@@ -58,6 +59,10 @@ class Curve(object):
         return not self.__eq__(other)
 
     # checks on curve
+
+    def __str__(self):
+        return "y^2 mod (" + str(self.prime) + ") = \
+                x^3 + " + str(self.a) + " * x + " + str(self.b) + " mod (" + str(self.prime) + ")"
 
 
 class EcPoint(object):
@@ -133,42 +138,44 @@ class EcPoint(object):
 
 class Keys(object):
 
-    def __init__(self, prv):
+    def __init__(self, prv, compressed=True):
         self.prv = prv
         self.pub = self.prv * EcPoint(ec_G[0], ec_G[1])
-        self.compressed = True
+        self.compressed = compressed
         self.version_prefix_prv_wif = b'\x80'
         self.version_prefix_address = b'\x00'
-        self.add = self.__pub_to_add()
+        self.add = self._pub_to_add()
 
-    def __prv_to_wif(self):
+    def _prv_to_wif(self):
         return b58encode_check(self.version_prefix_prv_wif + self.prv.to_bytes(32, "big") +
                                (b'\x01' if self.compressed else b''))
 
-    def __pub_to_bytes(self):
+    def _pub_to_bytes(self):
         if self.compressed:
             return (b'\x02' if self.pub.y % 2 == 0 else b'\x03') + self.pub.x.to_bytes(32, "big")
         else:
-            return "04" + self.pub.x.to_bytes(32, "big") + self.pub.y.to_bytes(32, "big")
+            return b'\x04' + self.pub.x.to_bytes(32, "big") + self.pub.y.to_bytes(32, "big")
 
-    def __pub_to_add(self):
-        return h160(self.__pub_to_bytes())
+    def _pub_to_add(self):
+        return h160(self._pub_to_bytes())
 
-    def __add_to_wif(self):
-        return b58encode_check(self.version_prefix_address + self.__pub_to_add())
+    def _add_to_wif(self):
+        return b58encode_check(self.version_prefix_address + self._pub_to_add())
 
     def __str__(self):
         return \
-            "private key in hex:\n" + \
+            "\nformat:\n" + \
+            ("compressed" if self.compressed else "uncompressed") + \
+            "\nprivate key in hex:\n" + \
             hex(self.prv)[2:] + \
             "\nprivate key in wif:\n" + \
-            self.__prv_to_wif() + \
+            self._prv_to_wif() + \
             "\npublic key in hex:\n" + \
-            self.__pub_to_bytes().hex() + \
+            self._pub_to_bytes().hex() + \
             "\naddress in hex:\n" + \
-            self.__pub_to_add().hex() + \
+            self._pub_to_add().hex() + \
             "\naddress in wif:\n" + \
-            self.__add_to_wif()
+            self._add_to_wif()
 
 
 class DiceRoll:
@@ -178,36 +185,55 @@ class DiceRoll:
         self.base = base
         self.ind = ind
         self.max_ind = max_ind
-        self.result = self.__throw()
+        self.result = self._throw()
 
-    def __throw(self):
+    def _throw(self):
         dice = None
-        if self.method == 1:
+        if self.method == 1:  # insert from keyboard
             flag = True
             while flag:
-                str_input = "throw " + str(self.ind) + "/" + str(self.max_ind) + ", result: "
-                dice = int(input(str_input)) - 1
-                if dice in range(self.base):
-                    flag = False
+                padding = " " * (len(str(self.max_ind)) - len(str(self.ind)))
+                str_input = "throw " + padding + str(self.ind) + "/" + str(self.max_ind) + ", result: "
+                inp = input(str_input)
+                if all(c in "0123456789" for c in inp) and inp != "":
+                    dice = int(inp) - 1
+                    if dice in range(self.base):
+                        flag = False
+                    else:
+                        print("invalid result, insert again")
                 else:
-                    print("Invalid result, insert again")
-        if self.method == 2:
+                    print("invalid result, insert again")
+        if self.method == 2:  # dice result always 2
             dice = 1
-            print("throw " + str(self.ind) + "/" + str(self.max_ind) + ", result: " + str(dice + 1))
+            padding = " " * (len(str(self.max_ind)) - len(str(self.ind)))
+            print("throw " + padding + str(self.ind) + "/" + str(self.max_ind) + ", result: " + str(dice + 1))
+        if self.method == 3:  # throw pressing keyboard
+            t = TicToc()
+            t.tic()
+            input("Press enter to throw")
+            dice = int(t.tocvalue() * 10**8) % self.base
+            padding = " " * (len(str(self.max_ind)) - len(str(self.ind)))
+            print("throw " + padding + str(self.ind) + "/" + str(self.max_ind) + ", result: " + str(dice + 1))
         return dice
 
 
 class GeneratePrv:
 
-    def __init__(self, base):
+    def __init__(self, base, method=1):
+        if not isinstance(base, int):
+            raise TypeError("base must be an int")
+        if base < 0:
+            raise ValueError("base must be a positive int")
+        if method not in (1, 2, 3):
+            raise ValueError("method must be 1, 2 or 3")
         self.base = base
         self.n_throw = int(ceil(256 * log(2) / log(self.base)))  # approx ec_order is almost 2**256
-        self.method = 2
+        self.method = method
         self.curve = Curve(secp256k1_param)
         self.seq = []
-        self.prv = self.__receive_results()
+        self.prv = self._receive_results()
 
-    def __receive_results(self):
+    def _receive_results(self):
         print("\n_____________")
         print("Start generation of a private key using a dice with " + str(self.base) + " faces")
         n = self.n_throw - 1
@@ -226,161 +252,22 @@ class GeneratePrv:
             return prv
         else:
             print("The number generated is 0, repeat to generate safely")
-            return self.__receive_results()
+            return self._receive_results()
 
     def __str__(self):
-        return hex(self.prv)[2:]
+        seq_str = []
+        for r in self.seq:
+            seq_str += " " + str(r)
+        return "dice with " + str(self.base) + "faces\n" + \
+               "sequence of results:" + seq_str + "\n" + \
+               "private key: " + hex(self.prv)[2:]
 
 
-gp = GeneratePrv(16)
-print(Keys(gp.prv))
+parser = ArgumentParser(description="Create private key with corresponding public key and address")
+parser.add_argument("base", type=int, help="dice number of faces")
+parser.add_argument("-m", "--method", type=int, choices=[1, 2, 3], default=1,
+                    help="method to insert randomness: 1 from dice, 2 all values are '1', 3 from keyboard")
+parser.add_argument("-u", "--uncompressed", help="obtain uncompressed keys and address", action="store_true")
 
-'''
-class CreatePrv:
-    
-    def __init__(self, method, base):
-        self.method = method
-        self.base = base
-        self.n_throw = self.compute_n_throw()
-        self.compressed = True
-        self.prv 
-        self.pub
-        self.add
-
-
-class CreatePrv:
-
-    def __init__(self):
-        self.method = self.decide_method()
-        self.get_base()
-        self.compressed = True
-        self.prv = self.receive_dice_results()
-        self.prv_to_pub()
-        self.add = self.pub_to_add()
-
-        self.print_stuff()
-
-    def decide_method(self):
-        print("How do you want to generate the randomness?")
-        print("1    : insert manually")
-        print("dumb : dumb way for testing")
-        print("other: from keyboard")
-        inp = input()
-        if inp == "1": return 1
-        elif inp == "dumb": return 2
-        else: return 0
-
-    def get_base(self):
-        base = int(input("How many faces does the dice have?  "))
-        assert base > 0, "the number of faces must be a postive int"
-        self.base = base
-        self.n_throw = int( ceil(256 * log(2) / log(self.base))) # approx ec_order is almost 2**256
-
-    def roll_dice_with_keyboard(self, ind, max_ind):
-        t = TicToc()
-        t.tic()
-        print("shaking dice ...")
-        input("press a key to roll")
-        r = t.tocvalue()
-        r = int(r * 10**8) % self.base
-        print("throw " + str(ind) + "/" + str(max_ind)+ " : " + str(r + 1))
-        return r
-
-    def get_digit(self, ind, max_ind):
-        str_input = str(ind) + "/" + str(max_ind) + " -- insert digit:"
-        digit = int(input(str_input)) - 1
-        if digit in range(self.base): return digit
-        else:
-            print("Insert again")
-            return self.get_digit(ind, max_ind)
-
-    def dumb(self): # very bad written!
-        n = int(input("insert dumb value  ")) - 1
-        assert n in range(self.base)
-        prv = 0
-        for i in range(self.n_throw):
-            prv += n * self.base**i
-            if prv >= ec_order:
-                prv -= n * self.base**i
-                print_dumb_seq(n, i, self.n_throw)
-                return prv
-
-        assert 0 < prv and prv < ec_order, "invalid dumb value"
-        print_dumb_seq(n, i, self.n_throw)
-        return prv
-
-    def receive_dice_results(self):
-        if self.method == 1:
-            roll_func = self.get_digit
-        elif self.method == 2:
-            return self.dumb()
-        else:
-            roll_func = self.roll_dice_with_keyboard
-        print("\nStart now! _______________________________________")
-        prv = 0
-        exceed = False
-        n = self.n_throw - 1
-        while n >= 0 and not exceed:
-            prv += roll_func(n + 1, self.n_throw) * self.base**(n)
-            if prv > ec_order:
-                exceed = True
-                print("Exceeded max dimension, repeat to generate safely")
-            n -= 1
-        if exceed: return self.receive_dice_results()
-        elif prv == 0:
-            print("prv can't be 0, repeat to generate safely")
-            return self.receive_dice_results()
-        else: return prv
-
-    def set_uncompressed(self):
-        self.compressed = False
-
-    def set_compressed(self):
-        self.compressed = True
-
-    def prv_to_wif(self):
-        return b58encode_check(b'\x80' + self.prv.to_bytes(32, "big") + \
-               (b'\x01' if self.compressed else b''))
-
-    def print_stuff(self):
-        print("\n__________________________________________________")
-        print("format: " + ("compressed" if self.compressed else "uncompressed"))
-        print("private key in hex:")
-        print(hex(self.prv))
-        print("private key in WIF:")
-        print(self.prv_to_wif())
-        print("public key:")
-        print(self.pub)
-        print("address:")
-        print(self.add)
-
-    def prv_to_pub(self):
-        pub = ec_multiply(self.prv, ec_G)
-        if self.compressed:
-            self.pub = ("02" if pub[1] % 2 == 0 else "03") + to_bytes_str(pub[0])
-        else:
-            self.pub = "04" + to_bytes_str(pub[0]) + to_bytes_str(pub[1])
-
-    def pub_to_add(self):
-        return b58encode_check(b'\x00' + h160(self.pub.encode()))
-
-
-def bytes_length(b):
-    return (b.bit_length() + 7) // 8
-
-
-def to_bytes_str(s):
-    return s.to_bytes(bytes_length(s), "big").hex()
-
-
-def print_dumb_seq(n, i, n_throw):
-    seq = ""
-    for j in range (n_throw):
-        seq += (str(n + 1) if j < i else str(0)) + "-"
-    print("dumb sequence, from bottom to top")
-    print(seq)
-    print(i, "times", n+1, "and", n_throw-i, "times 0")
-
-
-#cp = CreatePrv()
-'''
+args = parser.parse_args()
+print(Keys(GeneratePrv(args.base, args.method).prv, not args.uncompressed))
