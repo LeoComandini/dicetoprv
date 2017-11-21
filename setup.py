@@ -11,10 +11,10 @@ setup(name='dicetoprv',
       install_requires=[
           'base58',
           'pytictoc',
-          'numpy',
-          'math',
-          'hashlib',
+          'numpy',  # 'math', 'hashlib',
           'argparse'
       ],
-      script=['bin/generateprv'],
+      entry_points={
+          'console_scripts': ['generateprv=dicetoprv.command_line:main']
+      },
       zip_safe=False)
