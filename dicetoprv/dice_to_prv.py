@@ -11,7 +11,7 @@ create a new private key
 from pytictoc import TicToc
 from numpy import log
 from math import ceil
-from base58 import b58encode_check
+from base58 import b58encode_check, b58decode_check, alphabet as b58digits
 from hashlib import sha256, new as hash_new
 from argparse import ArgumentParser
 
@@ -271,3 +271,34 @@ def receive_arguments():
     parser.add_argument("-u", "--uncompressed", help="obtain uncompressed keys and address", action="store_true")
     args = parser.parse_args()
     return Keys(GeneratePrv(args.base, args.method).prv, not args.uncompressed)
+
+
+def prv_details():
+    parser = ArgumentParser(description="From a private key obtain private key in hex and WIF, public key, "
+                                        "address in hex and WIF")
+    parser.add_argument("private_key", help="private key in hex or wif", type=str)
+    parser.add_argument("-f", "--format", help="format for keys and address: 'c' compressed (default), 'u' uncompressed"
+                        , choices=["c", "u"], default="c")
+    args = parser.parse_args()
+    prv, compressed_wif = decode_prv(args.private_key)
+    compressed_arg = args.format == "c"
+    if compressed_wif is not None and compressed_wif + compressed_arg == 1:
+        print("\nformat from WIF:\n" + ("compressed" if compressed_wif else "uncompressed"))
+    return Keys(prv, compressed_arg)
+
+
+def decode_prv(prv_str):
+    if not isinstance(prv_str, str):
+        raise TypeError("private key must be a string")
+    lp = len(prv_str)
+    if lp in (51, 52):  # WIF
+        if not all(c in b58digits for c in prv_str):
+            raise TypeError("private key in WIF must use base58 char")
+        return int.from_bytes(b58decode_check(prv_str)[1:33], "big"), lp == 52
+    if lp == 66 and prv_str[:2] == "0x":
+        prv_str = prv_str[2:]
+    if lp <= 64:
+        if not all(c in "0123456789abcdefABCDEF" for c in prv_str):
+            raise TypeError("private key in hex must use hex char")
+        return int(prv_str, 16), None
+    raise ValueError("Invalid private key")
