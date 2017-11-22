@@ -24,6 +24,10 @@ ec_gy = 0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8
 ec_G = (ec_gx, ec_gy)
 ec_order = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141
 secp256k1_param = ec_prime, ec_a, ec_b, ec_G, ec_order
+# version prefix
+version_prefix_prv = b'\x80'
+version_prefix_add = b'\x00'
+
 
 # adapted from https://github.com/alexmgr/tinyec
 
@@ -138,12 +142,12 @@ class EcPoint(object):
 
 class Keys(object):
 
-    def __init__(self, prv, compressed=True):
+    def __init__(self, prv, compressed=True, prefix_prv=version_prefix_prv, prefix_add=version_prefix_add):
         self.prv = prv
         self.pub = self.prv * EcPoint(ec_G[0], ec_G[1])
         self.compressed = compressed
-        self.version_prefix_prv_wif = b'\x80'
-        self.version_prefix_address = b'\x00'
+        self.version_prefix_prv_wif = prefix_prv
+        self.version_prefix_address = prefix_add
         self.add = self._pub_to_add()
 
     def _prv_to_wif(self):
@@ -269,8 +273,30 @@ def receive_arguments():
     parser.add_argument("-m", "--method", type=int, choices=[1, 2, 3], default=1,
                         help="method to insert randomness: 1 from dice, 2 all values are '1', 3 from keyboard")
     parser.add_argument("-u", "--uncompressed", help="obtain uncompressed keys and address", action="store_true")
+    parser.add_argument("-p", "--prefix_prv", help="version prefix for private keys in hex, in [0x00, 0xff]", type=str)
+    parser.add_argument("-a", "--prefix_add", help="version prefix for addresses in hex, in [0x00, 0xff]", type=str)
     args = parser.parse_args()
-    return Keys(GeneratePrv(args.base, args.method).prv, not args.uncompressed)
+    # temp, need to reorg!
+    if args.prefix_prv is not None and args.prefix_add is not None:
+        prefix_prv_b = str_to_1bytes(args.prefix_prv)
+        prefix_add_b = str_to_1bytes(args.prefix_add)
+        return Keys(GeneratePrv(args.base, args.method).prv, not args.uncompressed, prefix_prv_b, prefix_add_b)
+    else:
+        return Keys(GeneratePrv(args.base, args.method).prv, not args.uncompressed)
+
+
+def str_to_1bytes(s):
+    if not isinstance(s, str):
+        raise TypeError("s must be a str")
+    if len(s) >= 3:
+        if s[:2] == "0x":
+            s = s[2:]
+    if not all(c in "0123456789abcdefABCDEF" for c in s):
+        raise TypeError("s must have hex values")
+    h = int(s, 16)
+    if h < 0 or h > 0xff:
+        raise ValueError("hex should be between 0x00 and 0xff to be converted to 1 byte")
+    return h.to_bytes(1, "big")
 
 
 def prv_details():
@@ -284,7 +310,7 @@ def prv_details():
     compressed_arg = args.format == "c"
     if compressed_wif is not None and compressed_wif + compressed_arg == 1:
         print("\nformat from WIF:\n" + ("compressed" if compressed_wif else "uncompressed"))
-    return Keys(prv, compressed_arg)
+    return Keys(prv, compressed_arg, )
 
 
 def decode_prv(prv_str):
