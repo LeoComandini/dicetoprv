@@ -309,12 +309,21 @@ def prv_details():
     parser.add_argument("private_key", help="private key in hex or wif", type=str)
     parser.add_argument("-f", "--format", help="format for keys and address: 'c' compressed (default), 'u' uncompressed"
                         , choices=["c", "u"], default="c")
+    parser.add_argument("-p", "--prv_version", help="version prefix for private key in hex, in [0x00, 0xff]",
+                        type=str, default=version_prefix_prv.hex())
+    parser.add_argument("-a", "--add_version", help="version prefix for address in hex, in [0x00, 0xff]",
+                        type=str, default=version_prefix_add.hex())
     args = parser.parse_args()
-    prv, compressed_wif = decode_prv(args.private_key)
+    version_prv, prv, compressed_wif = decode_prv(args.private_key)
+    if version_prv is None:
+        prefix_prv_b = str_to_1bytes(args.prv_version)
+    else:
+        prefix_prv_b = version_prv
+    prefix_add_b = str_to_1bytes(args.add_version)
     compressed_arg = args.format == "c"
     if compressed_wif is not None and compressed_wif + compressed_arg == 1:
         print("\nformat from WIF:\n" + ("compressed" if compressed_wif else "uncompressed"))
-    return Keys(prv, compressed_arg, )
+    return Keys(prv, compressed_arg, prefix_prv_b, prefix_add_b)
 
 
 def decode_prv(prv_str):
@@ -324,11 +333,12 @@ def decode_prv(prv_str):
     if lp in (51, 52):  # WIF
         if not all(c in b58digits for c in prv_str):
             raise TypeError("private key in WIF must use base58 char")
-        return int.from_bytes(b58decode_check(prv_str)[1:33], "big"), lp == 52
+        prv_b = b58decode_check(prv_str)
+        return prv_b[:1], int.from_bytes(prv_b[1:33], "big"), lp == 52
     if lp == 66 and prv_str[:2] == "0x":
         prv_str = prv_str[2:]
     if lp <= 64:
         if not all(c in "0123456789abcdefABCDEF" for c in prv_str):
             raise TypeError("private key in hex must use hex char")
-        return int(prv_str, 16), None
+        return None, int(prv_str, 16), None
     raise ValueError("Invalid private key")
