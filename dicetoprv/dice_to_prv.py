@@ -174,12 +174,16 @@ class Keys(object):
             hex(self.prv)[2:] + \
             "\nprivate key in wif:\n" + \
             self._prv_to_wif() + \
+            "\nprivate key prefix\n" + \
+            self.version_prefix_prv_wif.hex() + \
             "\npublic key in hex:\n" + \
             self._pub_to_bytes().hex() + \
             "\naddress in hex:\n" + \
             self._pub_to_add().hex() + \
             "\naddress in wif:\n" + \
-            self._add_to_wif()
+            self._add_to_wif() + \
+            "\naddress prefix\n" + \
+            self.version_prefix_address.hex()
 
 
 class DiceRoll:
