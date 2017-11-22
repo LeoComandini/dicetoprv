@@ -24,10 +24,9 @@ ec_gy = 0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8
 ec_G = (ec_gx, ec_gy)
 ec_order = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141
 secp256k1_param = ec_prime, ec_a, ec_b, ec_G, ec_order
-# version prefix
-version_prefix_prv = b'\x80'
-version_prefix_add = b'\x00'
-
+# version prefixes
+version_prefix_prv = {"mainnet": b'\x80', "testnet": b'\xef'}
+version_prefix_add = {"mainnet": b'\x00', "testnet": b'\x6f'}
 
 # adapted from https://github.com/alexmgr/tinyec
 
@@ -142,7 +141,8 @@ class EcPoint(object):
 
 class Keys(object):
 
-    def __init__(self, prv, compressed=True, prefix_prv=version_prefix_prv, prefix_add=version_prefix_add):
+    def __init__(self, prv, compressed=True, prefix_prv=version_prefix_prv["mainnet"],
+                 prefix_add=version_prefix_add["mainnet"]):
         self.prv = prv
         self.pub = self.prv * EcPoint(ec_G[0], ec_G[1])
         self.compressed = compressed
@@ -310,9 +310,9 @@ def prv_details():
     parser.add_argument("-f", "--format", help="format for keys and address: 'c' compressed (default), 'u' uncompressed"
                         , choices=["c", "u"], default="c")
     parser.add_argument("-p", "--prv_version", help="version prefix for private key in hex, in [0x00, 0xff]",
-                        type=str, default=version_prefix_prv.hex())
+                        type=str, default=version_prefix_prv["mainnet"].hex())
     parser.add_argument("-a", "--add_version", help="version prefix for address in hex, in [0x00, 0xff]",
-                        type=str, default=version_prefix_add.hex())
+                        type=str, default=version_prefix_add["mainnet"].hex())
     args = parser.parse_args()
     version_prv, prv, compressed_wif = decode_prv(args.private_key)
     if version_prv is None:
@@ -342,3 +342,19 @@ def decode_prv(prv_str):
             raise TypeError("private key in hex must use hex char")
         return None, int(prv_str, 16), None
     raise ValueError("Invalid private key")
+
+
+def prv_wif_info():
+    parser = ArgumentParser(description="extract all the info from a bitcoin wif string")
+    parser.add_argument("wif_str", help="wif string, in base58", type=str)
+    args = parser.parse_args()
+    try:
+        wif_decoded = b58decode_check(args.wif_str.encode())
+        version = wif_decoded[:1]
+        prv = wif_decoded[1:33]
+        compressed = len(args.wif_str) == 52
+        print("format\n" + ("" if compressed else "un") + "compressed")
+        print("version prefix in hex\n" + version.hex())
+        print("private key in hex\n" + hex(int.from_bytes(prv, "big"))[2:])
+    except ValueError:
+        print("invalid checksum")

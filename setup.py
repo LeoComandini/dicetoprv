@@ -16,6 +16,7 @@ setup(name='dicetoprv',
       ],
       entry_points={
           'console_scripts': ['generateprv=dicetoprv.command_line:main',
-                              'prvdetails=dicetoprv.command_line:prvdet']
+                              'prvdetails=dicetoprv.command_line:prvdet',
+                              'decodeprv=dicetoprv.command_line:prvdec']
       },
       zip_safe=False)

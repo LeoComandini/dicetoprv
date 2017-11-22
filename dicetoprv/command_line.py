@@ -7,3 +7,7 @@ def main():
 
 def prvdet():
     print(dicetoprv.prv_details())
+
+
+def prvdec():
+    dicetoprv.prv_wif_info()
