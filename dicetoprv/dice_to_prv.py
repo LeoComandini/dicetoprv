@@ -186,6 +186,47 @@ class Keys(object):
             self.version_prefix_address.hex()
 
 
+class PrivateKey(object):
+
+    def __init__(self, prv, version=version_prefix_prv["mainnet"], is_compressed=True, curve=Curve(secp256k1_param)):
+        self.curve = curve
+        if not isinstance(prv, int):
+            raise TypeError("prv must be an int")
+        if 0 >= prv or prv >= self.curve.order:
+            raise ValueError("prv must be in [1..order]")
+        self.prv = self._check_prv(prv)
+        if not isinstance(version, bytes):
+            raise TypeError("version prefix must be in bytes")
+        self.version = version
+        if not isinstance(is_compressed, bool):
+            raise TypeError("is_compressed must be bool")
+        self.compressed = is_compressed
+
+    def to_wif(self):
+        return b58encode_check(self.version + self.prv.to_bytes(32, "big") + (b'\x01' if self.compressed else b''))
+
+    def print_verbose(self):
+        print("\nprivate key in hex:\n" + str(hex(self.prv)[2:]) +
+              "\nformat:\n" + ("" if self.compressed else "un") + "compressed" +
+              "\nversion prefix:\n" + self.version.hex() +
+              "\nprivate key in wif:\n" + self.to_wif()
+              )
+
+    def __str__(self):
+        return "\nprivate key in hex:\n" + str(hex(self.prv)[2:])
+
+
+class PublicKey(object):
+
+    def __init__(self, p, is_compressed):
+        if not isinstance(p, EcPoint):
+            raise TypeError("p must be an ec point")
+        self.p = p
+        if not isinstance(is_compressed, bool):
+            raise TypeError("is_compressed must be bool")
+        self.compressed = is_compressed
+
+
 class DiceRoll:
 
     def __init__(self, method, base, ind, max_ind):
@@ -358,3 +399,7 @@ def prv_wif_info():
         print("private key in hex\n" + hex(int.from_bytes(prv, "big"))[2:])
     except ValueError:
         print("invalid checksum")
+
+
+def generate_prv():
+    return 0
