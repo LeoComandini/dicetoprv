@@ -15,8 +15,10 @@ setup(name='dicetoprv',
           'argparse'
       ],
       entry_points={
-          'console_scripts': ['generateprv=dicetoprv.command_line:main',
+          'console_scripts': ['generateprvold=dicetoprv.command_line:main',
                               'prvdetails=dicetoprv.command_line:prvdet',
-                              'decodeprv=dicetoprv.command_line:prvdec']
+                              'decodeprv=dicetoprv.command_line:prvdec',
+                              'generateprv=dicetoprv.command_line:generateprv',
+                              'prvtoadd=dicetoprv.command_line:prvtoadd']
       },
       zip_safe=False)

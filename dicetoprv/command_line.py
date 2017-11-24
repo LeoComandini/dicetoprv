@@ -11,3 +11,11 @@ def prvdet():
 
 def prvdec():
     dicetoprv.prv_wif_info()
+
+
+def generateprv():
+    dicetoprv.generate_prv()
+
+
+def prvtoadd():
+    dicetoprv.prv_to_add()
