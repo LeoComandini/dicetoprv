@@ -17,8 +17,9 @@ setup(name='dicetoprv',
       entry_points={
           'console_scripts': ['generateprvold=dicetoprv.command_line:main',
                               'prvdetails=dicetoprv.command_line:prvdet',
-                              'decodeprv=dicetoprv.command_line:prvdec',
+                              'decodeprvwif=dicetoprv.command_line:cmd_decode_prv_wif',
                               'generateprv=dicetoprv.command_line:generateprv',
-                              'prvtoadd=dicetoprv.command_line:prvtoadd']
+                              'prvtoadd=dicetoprv.command_line:prvtoadd',
+                              'prvhextowif=dicetoprv.command_line:cmd_prv_hex_to_wif']
       },
       zip_safe=False)

@@ -9,8 +9,12 @@ def prvdet():
     print(dicetoprv.prv_details())
 
 
-def prvdec():
-    dicetoprv.prv_wif_info()
+def cmd_decode_prv_wif():
+    dicetoprv.decode_prv_wif()
+
+
+def cmd_prv_hex_to_wif():
+    dicetoprv.prv_hex_to_wif()
 
 
 def generateprv():

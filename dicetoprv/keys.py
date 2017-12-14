@@ -59,6 +59,15 @@ def mod_inv(a, p):
 
 
 # def mod_sqrt(s, p): # missing
+def mod_sqrt(a, p):
+    """since in secp256k1 p = 3 (mod 4) then the if the square root mod p of a exists it is
+    x = a ** ((n+1)/4) (mod n)
+    """
+    x = pow(a, (p + 1) // 4, p)
+    if x ** 2 % p == a:
+        return x
+    else:
+        return 0
 
 
 class EcPoint(object):
@@ -93,8 +102,9 @@ class EcPoint(object):
             raise ValueError("ec point coordinate must be in [1..prime]")
         if y_odd in (0, 1):
             raise ValueError("y_odd must be 0 or 1")
-        # y = mod_sqrt(x**3 + self.curve.b * x + self.curve.a, self.curve.prime)
-        y = x  # temp, now mod_sqrt is missing!
+        y = mod_sqrt(x**3 + self.curve.b * x + self.curve.a, self.curve.prime)
+        if y == 0:  # may be not valid if parameters are changed
+            raise ValueError("x is not a licit coordinate for a point on the curve")
         if y % 2 + y_odd == 1:
             y = self.curve.prime - y
         self.x = x

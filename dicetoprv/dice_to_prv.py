@@ -401,5 +401,44 @@ def prv_wif_info():
         print("invalid checksum")
 
 
+def decode_prv_wif():
+    parser = ArgumentParser(description="extract all the information from a private key in wif")
+    parser.add_argument("wif_str", help="private key, in wif format", type=str)
+    args = parser.parse_args()
+    try:
+        wif_decoded = b58decode_check(args.wif_str.encode())
+        version = wif_decoded[:1]
+        prv = wif_decoded[1:33]
+        compressed = len(args.wif_str) == 52 and wif_decoded[33:] == b'\x01'
+        if not compressed and len(args.wif_str) != 51:
+            raise ValueError("private key longer then expected")
+        print("format\n" + ("" if compressed else "un") + "compressed")
+        print("version prefix in hex\n" + version.hex())
+        print("private key in hex\n" + hex(int.from_bytes(prv, "big"))[2:])
+    except ValueError:
+        print("invalid checksum")
+
+
+def is_hex(s):
+    return(all(c in "0123456789abcdefABCDEF") for c in s)
+
+
+def prv_hex_to_wif():
+    parser = ArgumentParser(description="from private key in hex to with format")
+    parser.add_argument("hex_str", help="private key, in hex", type=str)
+    parser.add_argument("-p", "--prv_version", help="version prefix for private key in hex, in [0x00, 0xff]",
+                        type=str, default=version_prefix_prv["mainnet"].hex())
+    parser.add_argument("-u", "--uncompressed", help="obtain an uncompressed key, default is compressed",
+                        action="store_true")
+    args = parser.parse_args()
+    if not is_hex(args.hex_str):
+        raise TypeError("expected hex string")
+    prv = str_to_1bytes(args.prv_version) + int(args.hex_str, 16).to_bytes(32, "big") + \
+        (b'' if args.uncompressed else b'\x01')
+    #  fixme: use class PrivateKey instead
+
+    print(b58encode_check(prv))
+
+
 def generate_prv():
     return 0
