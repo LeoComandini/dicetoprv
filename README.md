@@ -10,3 +10,9 @@ generate a private key using a 20 faces dice:
 ```
 $ generateprv 20
 ```
+
+compute the address corresponding to a private key along with its details
+```
+$ prvtoadd PRIVATE_KEY_WIF
+```
+

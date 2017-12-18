@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 """
+DEPRECATED
+
 create a new private key
  1. insert randomness from the dice
  2. dumb way for testing
@@ -439,6 +441,3 @@ def prv_hex_to_wif():
 
     print(b58encode_check(prv))
 
-
-def generate_prv():
-    return 0
