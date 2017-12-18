@@ -71,7 +71,7 @@ def mod_sqrt(a, p):
     x = a ** ((n+1)/4) (mod n)
     """
     x = pow(a, (p + 1) // 4, p)
-    if x ** 2 % p == a:
+    if x ** 2 % p == a % p:
         return x
     else:
         return 0
@@ -109,7 +109,7 @@ class EcPoint(object):
             raise TypeError("ec point coordinate must be int")
         if 0 >= x or x >= self.curve.prime:
             raise ValueError("ec point coordinate must be in [1..prime]")
-        if y_odd in (0, 1):
+        if y_odd not in (0, 1):
             raise ValueError("y_odd must be 0 or 1")
         y = mod_sqrt(x**3 + self.curve.b * x + self.curve.a, self.curve.prime)
         if y == 0:  # may be not valid if parameters are changed
@@ -118,7 +118,7 @@ class EcPoint(object):
             y = self.curve.prime - y
         self.x = x
         self.y = y
-        self.inf=False
+        self.inf = False
         self.on_curve = self.is_on_curve()
 
     def set_curve(self, curve):
@@ -282,7 +282,8 @@ class PublicKey(object):
 
     def to_bytes(self):
         if self.public_key is None:
-            raise ValueError("public key is not set")
+            # raise ValueError("public key is not set")
+            return b''
         if self.compressed:
             return (b'\x02' if self.public_key.y % 2 == 0 else b'\x03') + self.public_key.x.to_bytes(32, "big")
             # 32 or min len bytes?
@@ -321,12 +322,11 @@ class Address(object):
         self.set_private(PrivateKey(private))
 
     def set_private(self, private):
-        if private.prv is not None:
-            if not isinstance(private, PrivateKey):
-                raise TypeError("expected PrivateKey object")
-            public = PublicKey()
-            public.set_private(private)
-            self.set_public(public)
+        if not isinstance(private, PrivateKey):
+            raise TypeError("expected PrivateKey object")
+        public = PublicKey()
+        public.set_private(private)
+        self.set_public(public)
 
     def set_public(self, public):
         if not isinstance(public, PublicKey):
@@ -336,7 +336,7 @@ class Address(object):
         self.address = h160(self.public.to_bytes())
 
     def set_address(self, address):
-        if self.public is not None:
+        if self.public.public_key is not None:
             raise ValueError("cannot set address if public key is already set")
         if not (isinstance(address, bytes) and len(address) == 20):
             raise TypeError("expected 20 bytes")
@@ -481,6 +481,12 @@ def str_to_1bytes(s):
     return h.to_bytes(1, "big")
 
 
+def hex_to_bytes(h, max_len):
+    if type(h) != str or not is_hex(h) and len(h) > max_len and len(h) % 2 == 1:
+        raise TypeError("expected hex string, with an even number of chars less or equal to" + str(max_len))
+    return int(h, 16).to_bytes(len(h)//2, "big")
+
+
 def generate_prv():
     parser = ArgumentParser(description="Create private key from dice result")
     parser.add_argument("base", type=int, help="dice number of faces")
@@ -502,18 +508,21 @@ def generate_prv():
 def decode_prv(prv_wif):
     if type(prv_wif) != str or not is_b58(prv_wif) or len(prv_wif) not in (51, 52):
         raise TypeError("expected a wif string of 51 or 52 char")
+    try:
+        b58decode_check(prv_wif.encode())
+    except:
+        ValueError("invalid checksum")
     wif_decoded = b58decode_check(prv_wif.encode())
     version = wif_decoded[:1]
     prv = int.from_bytes(wif_decoded[1:33], "big")
-    if len(prv_wif) == 52:
-        if wif_decoded[-1] == 1:
-            compressed = True
-        else:
-            raise TypeError("as last value expected b'' (uncompressed) or b'\x01' (compressed)")
     private = PrivateKey(prv)
     private.set_version(version)
-    if not compressed:
+    if len(prv_wif) == 52:
+        if wif_decoded[-1] != 1:
+            raise TypeError("when the private key is compressed the last value must be a b'\x01'")
+    else:
         private.set_uncompressed()
+    return private
 
 
 def prv_to_add():
@@ -522,15 +531,12 @@ def prv_to_add():
     parser.add_argument("-p", "--prefix_add", help="version prefix for address in hex, in [0x00, 0xff]", type=str)
     parser.add_argument("-v", "--verbose", help="print more output", action="store_true")
     args = parser.parse_args()
-    try:
-        private = decode_prv(args.private_wif)
-        address = Address()
-        address.set_private(private)
-        if args.prefix_add is not None:
-            address.set_version(str_to_1bytes(args.prefix_add))
-        print(address.str_verbose() if args.verbose else address)
-    except ValueError:
-        print("invalid checksum")
+    private = decode_prv(args.private_wif)
+    address = Address()
+    address.set_private(private)
+    if args.prefix_add is not None:
+        address.set_version(str_to_1bytes(args.prefix_add))
+    print(address.str_verbose() if args.verbose else address)
 
 
 def decode_pub(pub_str):
@@ -563,18 +569,49 @@ def pub_to_add():
     print(address.str_verbose() if args.verbose else address)
 
 
-def add_details():
-    """
-    parser = ArgumentParser(description="Obtain address from public key")
-    parser.add_argument("public", type=str, help="public key in hex")
-    parser.add_argument("-p", "--prefix_add", help="version prefix for address in hex, in [0x00, 0xff]", type=str)
-    parser.add_argument("-v", "--verbose", help="print more output", action="store_true")
-    args = parser.parse_args()
-    public = decode_pub(args.public)
+def decode_add(address_wif):
+    if type(address_wif) != str or not is_b58(address_wif) or len(address_wif) > 34:
+        raise TypeError("expected a wif string of 34 or less char")
+    wif_decoded = b58decode_check(address_wif.encode())
+    version = wif_decoded[:1]
     address = Address()
-    address.set_address(address)
+    address.set_address(wif_decoded[1:21])
+    address.set_version(version)
+    return address
+
+
+def address_details():
+    parser = ArgumentParser(description="Obtain address details")
+    parser.add_argument("address", type=str, help="address in wif")
+    args = parser.parse_args()
+    address = decode_add(args.address)
+    print(address.str_verbose())
+
+
+def prv_hex_to_wif():
+    parser = ArgumentParser(description="From private key in hex to wif")
+    parser.add_argument("private_hex", type=str, help="private key in hex")
+    parser.add_argument("-p", "--prefix_prv", help="version prefix for private key in hex, in [0x00, 0xff]", type=str)
+    parser.add_argument("-u", "--uncompressed", help="uncompressed private key, default is compressed",
+                        action="store_true")
+    args = parser.parse_args()
+    if type(args.private_hex) != str or not is_hex(args.private_hex) and len(args.private_hex) > 64:
+        raise TypeError("expected hex string of 64 or less chars")
+    private = PrivateKey(int(args.private_hex, 16))
+    if args.prefix_prv is not None:
+        private.set_version(str_to_1bytes(args.prefix_prv))
+    if args.uncompressed:
+        private.set_uncompressed()
+    print(private)
+
+
+def add_hex_to_wif():
+    parser = ArgumentParser(description="From address in hex to wif")
+    parser.add_argument("address_hex", type=str, help="address in hex")
+    parser.add_argument("-p", "--prefix_add", help="version prefix for address in hex, in [0x00, 0xff]", type=str)
+    args = parser.parse_args()
+    address = Address()
+    address.set_address(hex_to_bytes(args.address_hex, 20 * 2))
     if args.prefix_add is not None:
         address.set_version(str_to_1bytes(args.prefix_add))
-    print(address.str_verbose() if args.verbose else address)
-    """
-    return 0
+    print(address)

@@ -16,6 +16,10 @@ setup(name='dicetoprv',
       ],
       entry_points={
           'console_scripts': ['generateprv=dicetoprv.command_line:cmd_generateprv',
-                              'prvtoadd=dicetoprv.command_line:cmd_prvtoadd']
+                              'prvtoadd=dicetoprv.command_line:cmd_prvtoadd',
+                              'pubtoadd=dicetoprv.command_line:cmd_pubtoadd',
+                              'addressdetails=dicetoprv.command_line:cmd_addressdetails',
+                              'prvhextowif=dicetoprv.command_line:cmd_prvhextowif',
+                              'addhextowif=dicetoprv.command_line:cmd_addhextowif']
       },
       zip_safe=False)
