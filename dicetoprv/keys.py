@@ -71,7 +71,7 @@ def mod_sqrt(a, p):
     x = a ** ((n+1)/4) (mod n)
     """
     x = pow(a, (p + 1) // 4, p)
-    if x ** 2 % p == a % p:
+    if x ** 2 % p == a % p or x ** 2 % p == -a % p:
         return x
     else:
         return 0
@@ -332,7 +332,8 @@ class Address(object):
         if not isinstance(public, PublicKey):
             raise TypeError("expected PublicKey object")
         self.public = public
-        self.compressed = public.compressed
+        if self.public.public_key is not None:
+            self.compressed = public.compressed
         self.address = h160(self.public.to_bytes())
 
     def set_address(self, address):
@@ -546,10 +547,14 @@ def decode_pub(pub_str):
     if type(pub_str) != str and is_hex(pub_str) and len(pub_str) not in (128, 66):
         raise TypeError("expected hex string of 128 or 66 char")
     pub = PublicKey()
-    if len(pub_str) == 128:
+    if len(pub_str) == 130:
+        if pub_str[:2] != "04":
+            raise TypeError("public key in uncompressed format must start with '04'")
         pub.set_uncompressed()
-        pub.set_public(EcPoint(x=int(pub_str[:64], 16), y=int(pub_str[64:], 16)))
+        pub.set_public(EcPoint(x=int(pub_str[2:66], 16), y=int(pub_str[66:], 16)))
     else:
+        if pub_str[:2] not in ("02", "03"):
+            raise TypeError("public key in compressed format must start with '02' or '03'")
         pub.set_compressed()
         pub.set_public(EcPoint(x=int(pub_str[2:], 16), y_odd=int(pub_str[:2], 16) % 2))
     return pub
@@ -615,3 +620,6 @@ def add_hex_to_wif():
     if args.prefix_add is not None:
         address.set_version(str_to_1bytes(args.prefix_add))
     print(address)
+
+
+# fixme: add field for empty public/private key, add tests
